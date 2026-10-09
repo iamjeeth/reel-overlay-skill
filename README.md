@@ -3,7 +3,10 @@
 Turns a finished 9:16 reel into one with captions, a title, image assets, comment/share cards and synced SFX, rendered by Claude Code.
 
 ## Install
-1. Unzip, rename the folder to `reel-overlay` and move it to `~/.claude/skills/` (so the path is `~/.claude/skills/reel-overlay/SKILL.md`).
+1. Clone it into your skills folder:
+   ```
+   git clone https://github.com/iamjeeth/reel-overlay-skill ~/.claude/skills/reel-overlay
+   ```
 2. Install the tools:
    ```
    brew install ffmpeg
