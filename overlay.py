@@ -275,9 +275,8 @@ def window(id, media, preset=None, x=None, y=None, w=None, h=None, t=(0, 1), ani
     if scroll and fit == "cover": fit = "width"
     if "radius" in p and radius == 36: radius = p["radius"]
     if push is None: push = p.get("push")
-    if push == "pan":   # the standard top-half layout: the insert lands WITH the sliding footage, fast; slow dissolves read as lag
-        if anim in ("fade", "dissolve", "down", "none", "blur", "zoom"): anim = "snap"
-        if out in ("fade", "dissolve", "none", "blur", "down"): out = "snap"
+    if push == "pan":   # the standard top-half layout: the insert CUTS in and out, the footage glides into place UNDER the opaque insert
+        anim = "cut"; out = "cut"   # any fade over moving footage double-exposes for a few frames = flicker; a cut plus a 0.24 s glide is clean
     person = bool(p.get("person"))
     if drift is None: drift = .035 if preset in ("tophalf", "full") else 0
     if drift is True: drift = .035
@@ -1457,7 +1456,7 @@ def push_ranges(ITEMS):
         if it["kind"] == "window" and it.get("push"):
             a = max(0.0, it["a"] - PUSH_D - PY_DIN.get(it.get("anim", "fade"), .2) * SMOOTH * .5)
             b = it["b"] + PY_DOUT.get(it.get("out", "fade"), .14) * SMOOTH
-            if it["push"] == "pan": a, b = max(0.0, it["a"] - .03), it["b"]   # slide and insert start together; slide back under the insert's exit
+            if it["push"] == "pan": a, b = it["a"], it["b"]   # glide in during the insert's first 0.24 s, glide back during its last 0.24 s, both hidden under the opaque insert
             key = ("pan", int(it.get("pan", 0))) if it["push"] == "pan" else float(it["push"])
             d.setdefault(key, []).append((a, b))
     for k, rg in d.items():

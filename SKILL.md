@@ -295,8 +295,10 @@ motion graphic by hand when a showcase video of the technology exists online.
   never shrunk, never side-cropped. For EVERY top-half window the head is measured at three moments (Vision matte: top and chin);
   the slide distance puts the highest head position 60 px under the insert (`PAN_GAP`), so the footage is cropped at the top as
   well as the bottom, the head is never clipped and there is no air above it (the user's limit: well under 15% of the half screen);
-  the subtitle sits 70 px under the lowest chin, inside the safe area. Speakers drift between windows, so one measurement is not enough. The slide takes 0.24 s and the insert SNAPS in during it (`anim="snap"` is forced for pan
-  windows; a slow dissolve reads as lag): no blurred or dark strip is ever seen on its own. The user rejected the old shrink with
+  the subtitle sits 70 px under the lowest chin, inside the safe area. Speakers drift between windows, so one measurement is not enough. The insert CUTS in and out (`anim`/`out` are forced to "cut" for pan windows) and the
+  footage glides into place in 0.24 s entirely UNDER the opaque insert, so no fade ever overlaps moving footage: no flicker, no
+  blurred or dark strip, no lag. On the way back the glide happens during the insert's last 0.24 s, then the insert cuts away
+  with the footage already home. The user rejected the old shrink with
   blurred side bars and the slow blurred lead-in; `push=<factor>` remains only for a deliberate special case. `--cue` prints the
   head line and each window's slide distance; `CFG["face_y"]` / `CFG["head_top"]` override.
 - Half-screen footage windows carry a soft dark gradient at the top (automatic) so the phrase stays readable over light films.
