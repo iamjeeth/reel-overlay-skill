@@ -25,6 +25,17 @@ Output, per reel, in `<build>/out/`:
   skill never runs silent. Real samples sound better: map them in `CFG["sfx"]`.
 - The user's asset folder: logos (SVG/PNG, transparent), people cutouts, memes/GIFs, screen recordings, screenshots.
 
+## Visual theme: chosen per reel, asked every time
+The look of headlines, caption accents, generated scenes and canvas set pieces comes from `CFG["theme"]`. Nothing is hardcoded;
+the skill proposes the fit for THIS video (tone, topic, speaker, brands) and asks the user with AskUserQuestion, three options plus
+custom, before storyboarding. Sometimes simple is right.
+- `lime`: lime #D4FF3F and white on near-black, one hot coral accent, bold kinetic type, exaggerated overshoot (over 2.3, amp 1.0).
+- `duotone`: electric yellow #FFE600 stages with violet #5B3DF5 accents, inverted per scene, loudest motion (over 2.6, amp 1.2).
+- `brand`: dark base, accent taken from the product being discussed (`CFG["brand_color"]`), text colour auto by luminance (over 2.0).
+- `simple`: the calm premium reference: pale yellow accents, yellow editorial cards, soft pops (over 1.7, amp .5).
+Headline hero words react: they slam in with a flash and the neighbouring words bump; captions pop; bars, counters, flow nodes and
+cards overshoot. All of it scales with the theme's amplitude, so `simple` stays quiet and `duotone` shouts. `--cue` prints the theme.
+
 ## Thumb rule: when in doubt, ask (before spending tokens)
 Whenever something about the video is unclear or two directions look equally right (which cut is the hook, which B-roll film or
 scene, which image or icon, caption style or wording, headline copy, which music mood or SFX palette, where a window may sit,
