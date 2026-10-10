@@ -275,6 +275,9 @@ def window(id, media, preset=None, x=None, y=None, w=None, h=None, t=(0, 1), ani
     if scroll and fit == "cover": fit = "width"
     if "radius" in p and radius == 36: radius = p["radius"]
     if push is None: push = p.get("push")
+    if push == "pan":   # the standard top-half layout: the insert lands WITH the sliding footage, fast; slow dissolves read as lag
+        if anim in ("fade", "dissolve", "down", "none", "blur", "zoom"): anim = "snap"
+        if out in ("fade", "dissolve", "none", "blur", "down"): out = "snap"
     person = bool(p.get("person"))
     if drift is None: drift = .035 if preset in ("tophalf", "full") else 0
     if drift is True: drift = .035
@@ -650,11 +653,12 @@ const cl=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)), ease=p=>1-Math.pow(1-cl(p),3), 
 const OVER=(window.THEME||{}).over||1.7, AMP=(window.THEME||{}).amp??1;   // exaggeration comes from the reel's theme
 const back=(p,c=OVER)=>{p=cl(p);return 1+(c+1)*Math.pow(p-1,3)+c*Math.pow(p-1,2)};
 const r=v=>Math.round(v*1000)/1000, $=id=>document.getElementById(id);
-const DIN={pop:.22,fade:.22,up:.38,down:.38,left:.42,right:.42,wipe:.28,none:0,zoom:.45,slam:.3,flip:.5,iris:.5,spin:.5,bounce:.6,blur:.4,rise:.45,type:0,dissolve:.55},
-      DOUT={fade:.14,pop:.16,cut:0,up:.3,down:.3,left:.3,right:.3,none:0,zoom:.3,iris:.35,slam:.18,blur:.25,dissolve:.45};
+const DIN={snap:.08,pop:.22,fade:.22,up:.38,down:.38,left:.42,right:.42,wipe:.28,none:0,zoom:.45,slam:.3,flip:.5,iris:.5,spin:.5,bounce:.6,blur:.4,rise:.45,type:0,dissolve:.55},
+      DOUT={snap:.08,fade:.14,pop:.16,cut:0,up:.3,down:.3,left:.3,right:.3,none:0,zoom:.3,iris:.35,slam:.18,blur:.25,dissolve:.45};
 const bounce=p=>{p=cl(p); const n1=7.5625,d1=2.75; return p<1/d1?n1*p*p:p<2/d1?n1*(p-=1.5/d1)*p+.75:p<2.5/d1?n1*(p-=2.25/d1)*p+.9375:n1*(p-=2.625/d1)*p+.984375};
 function enter(it,t){const d=(DIN[it.anim]??.2)*(CFG.smooth||1), p=d?cl((t-it.a)/d):1, dist=it.dist||(it.kind==='window'?760:120);
   switch(it.anim){
+    case 'snap': return [cl(p*1.6), `scale(${r(.985+.015*ease(p))})`];   // top-half insert: lands with the sliding footage, fast, no drift
     case 'pop': return [cl(p*3), `scale(${r(1-.8*AMP+.8*AMP*back(p))}) rotate(${r(-10*AMP*(1-ease(p)))}deg)`];   // exaggerated: from small, overshoot, a little twist
     case 'fade': return [ease(p), `scale(${r(.92+.08*ease(p))})`];
     case 'up': return [cl(p*4), `translateY(${r((1-ease(p))*dist)}px) rotate(${r((1-ease(p))*(it.kind==='window'?3:0))}deg)`];
@@ -676,6 +680,7 @@ function enter(it,t){const d=(DIN[it.anim]??.2)*(CFG.smooth||1), p=d?cl((t-it.a)
 function exit_(it,t){const d=(DOUT[it.out]??.14)*(CFG.smooth||1), p=d?cl((it.b-t)/d):1;
   switch(it.out){
     case 'cut': return [1,''];
+    case 'snap': return [cl(p*1.6), ''];
     case 'pop': return [cl(p*2), `scale(${r(.6+.4*p)})`];
     case 'up': return [cl(p*3), `translateY(${r(-(1-p)*500)}px)`];
     case 'down': return [cl(p*3), `translateY(${r((1-p)*700)}px)`];
@@ -1365,20 +1370,20 @@ def compose_chain(CFG, ITEMS, W, H, HDR, OUT, V, idx_fg, idx_bg=None, idx_mt=Non
     return ";".join(parts)
 
 def blur_ranges(ITEMS): return [(it["a"], it["b"]) for it in ITEMS if it["kind"] == "window" and it["blur"] and not it.get("push")]
-PY_DOUT = dict(fade=.14, pop=.16, cut=0, up=.3, down=.3, left=.3, right=.3, none=0, zoom=.3, iris=.35, slam=.18, blur=.25, dissolve=.45)
-PY_DIN = dict(pop=.22, fade=.22, up=.38, down=.38, left=.42, right=.42, wipe=.28, none=0, zoom=.45, slam=.3, flip=.5, iris=.5, spin=.5, bounce=.6, blur=.4, rise=.45, type=0, dissolve=.55)
+PY_DOUT = dict(snap=.08, fade=.14, pop=.16, cut=0, up=.3, down=.3, left=.3, right=.3, none=0, zoom=.3, iris=.35, slam=.18, blur=.25, dissolve=.45)
+PY_DIN = dict(snap=.08, pop=.22, fade=.22, up=.38, down=.38, left=.42, right=.42, wipe=.28, none=0, zoom=.45, slam=.3, flip=.5, iris=.5, spin=.5, bounce=.6, blur=.4, rise=.45, type=0, dissolve=.55)
 SMOOTH = 1.0
 
 def face_y(CFG, CUT, OUT, W, H, at):
     """Vertical centre of the speaker's face (1920-scale px) at time `at`, from the Vision person matte: head top + ~230 px.
     CFG["face_y"] overrides; cached per cut in <out>/face.json."""
-    if CFG.get("face_y"): return float(CFG["face_y"])
+    if CFG.get("face_y"): return dict(face=float(CFG["face_y"]), top=float(CFG.get("head_top", CFG["face_y"] - 230)))
     f = OUT / "face.json"; sig = f"{pathlib.Path(CUT).stat().st_mtime}_{pathlib.Path(CUT).stat().st_size}_{at:.2f}"
     try:
         c = json.loads(f.read_text())
-        if c.get("sig") == sig: return c["face_y"]
+        if c.get("sig") == sig and "top" in c: return dict(face=c["face_y"], top=c["top"])
     except Exception: pass
-    fy = 480.0
+    fy, top = 480.0, 250.0
     try:
         import tempfile, shutil
         tmp = pathlib.Path(tempfile.mkdtemp())
@@ -1393,7 +1398,7 @@ def face_y(CFG, CUT, OUT, W, H, at):
             fy = min(900.0, max(300.0, top + 230))
         shutil.rmtree(tmp, ignore_errors=True)
     except Exception as e: print(f"  face: Vision matte failed ({e}), assuming face at y 480")
-    f.write_text(json.dumps(dict(sig=sig, face_y=fy))); return fy
+    f.write_text(json.dumps(dict(sig=sig, face_y=fy, top=top))); return dict(face=fy, top=top)
 
 def pan_setup(CFG, ITEMS, CUT, OUT, W, H):
     """The standard top-half layout: the footage keeps its full width and slides down by T px (never scaled, never side-cropped), so the
@@ -1401,14 +1406,14 @@ def pan_setup(CFG, ITEMS, CUT, OUT, W, H):
     just under the chin, inside the safe area. T is clamped to the window's bottom edge so no gap opens between B-roll and footage."""
     pans = [it for it in ITEMS if it["kind"] == "window" and it.get("push") == "pan"]
     if not pans: return
-    fy = face_y(CFG, CUT, OUT, W, H, pans[0]["a"])
+    F = face_y(CFG, CUT, OUT, W, H, pans[0]["a"]); fy, top = F["face"], F["top"]
     for it in pans:
-        bottom = it["y"] + it["h"]; centre = (bottom + 1920) / 2
-        T = int(max(0, min(bottom, centre - fy, 1300 - fy)))
+        bottom = it["y"] + it["h"]
+        T = int(max(0, min(bottom, bottom - top + 36)))   # head top lands 36 px under the insert: cropped at the top as well, no dead wall above the head
         it["pan"] = T
-        if it.get("cap_y") is None or it["cap_y"] == 1420: it["cap_y"] = int(min(1535, fy + T + 230))
-    CFG["_pan"] = dict(face_y=fy, T=[it["pan"] for it in pans])
-    print(f"layout: face at y {fy:.0f}; top-half windows slide the footage down " + ", ".join(f"{it['id']}={it['pan']}px" for it in pans) + " (full width, no shrink)")
+        if it.get("cap_y") is None or it["cap_y"] == 1420: it["cap_y"] = int(min(1535, max(1100, fy + T + 250)))
+    CFG["_pan"] = dict(face_y=fy, head_top=top, T=[it["pan"] for it in pans])
+    print(f"layout: head top y {top:.0f}, face y {fy:.0f}; top-half windows slide the footage down " + ", ".join(f"{it['id']}={it['pan']}px" for it in pans) + f" so the head sits right under the insert (full width, {PAN_D}s slide)")
 
 def push_ranges(ITEMS):
     """Footage-shrink ranges per push factor. The layout change never overlaps the window's own fade: the footage shrinks BEFORE the
@@ -1419,6 +1424,7 @@ def push_ranges(ITEMS):
         if it["kind"] == "window" and it.get("push"):
             a = max(0.0, it["a"] - PUSH_D - PY_DIN.get(it.get("anim", "fade"), .2) * SMOOTH * .5)
             b = it["b"] + PY_DOUT.get(it.get("out", "fade"), .14) * SMOOTH
+            if it["push"] == "pan": a, b = max(0.0, it["a"] - .03), it["b"]   # slide and insert start together; slide back under the insert's exit
             key = ("pan", int(it.get("pan", 0))) if it["push"] == "pan" else float(it["push"])
             d.setdefault(key, []).append((a, b))
     for k, rg in d.items():
@@ -1429,16 +1435,18 @@ def push_ranges(ITEMS):
         d[k] = merged
     return d
 
+PAN_D = .24    # seconds for the full-width slide (pan): fast, never scaled by smooth; the insert snaps in during it
 PUSH_D = .38   # seconds for the footage to shrink / grow back (matches the window's slide-down); scaled by CFG smooth in grade_setup
 
-def _ramp(rg, at=None):
+def _ramp(rg, at=None, D=None):
     """max over ranges of smoothstep(in) * smoothstep(out): 0 outside, 1 fully pushed, eased at both ends. ffmpeg expr or a float."""
+    D = D or PUSH_D
     if at is not None:
         v = 0.0
         for a, b in rg:
-            pi, po = min(1, max(0, (at - a) / PUSH_D)), min(1, max(0, (b - at) / PUSH_D)); x = pi * po; v = max(v, x * x * (3 - 2 * x))
+            pi, po = min(1, max(0, (at - a) / D)), min(1, max(0, (b - at) / D)); x = pi * po; v = max(v, x * x * (3 - 2 * x))
         return v
-    terms = [f"st(0\\,clip((t-{a:.3f})/{PUSH_D}\\,0\\,1)*clip(({b:.3f}-t)/{PUSH_D}\\,0\\,1))*0+ld(0)*ld(0)*(3-2*ld(0))" for a, b in rg]
+    terms = [f"st(0\\,clip((t-{a:.3f})/{D}\\,0\\,1)*clip(({b:.3f}-t)/{D}\\,0\\,1))*0+ld(0)*ld(0)*(3-2*ld(0))" for a, b in rg]
     e = terms[0]
     for t_ in terms[1:]: e = f"max({e}\\,{t_})"
     return e
@@ -1458,7 +1466,7 @@ def base_filter(ITEMS, W, H, at=None):
         if not active(rg): continue
         if isinstance(sc, tuple):   # pan: the footage keeps its full width and slides down by T px so the face sits in the bottom section
             T = sc[1] * H / 1920
-            y = f"{T * _ramp(rg, at):.1f}" if at is not None else f"'{T:.1f}*({_ramp(rg)})'"
+            y = f"{T * _ramp(rg, at, PAN_D):.1f}" if at is not None else f"'{T:.1f}*({_ramp(rg, None, PAN_D)})'"
             # the strip above the sliding footage is a dark panel (the insert's own backdrop arriving), not a blurred copy of the room
             parts.append(f"{cur}split[p{k}a][p{k}b];[p{k}a]drawbox=c=0x0f1115:t=fill{en(rg)}[p{k}g];"
                          f"[p{k}g][p{k}b]overlay=x=0:y={y}:eval=frame{en(rg)}[p{k}]"); cur = f"[p{k}]"

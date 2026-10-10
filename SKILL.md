@@ -284,10 +284,12 @@ motion graphic by hand when a showcase video of the technology exists online.
 - One-spot fix after a code or config change: delete the affected frames in `out/frames_fg_*` and run with `REEL_KEEP_CACHE=1`
   so the untouched frames are reused.
 - **Top-half layout standard (`preset="tophalf"`)**: the B-roll fills the top 800 px and the FOOTAGE SLIDES DOWN AT FULL WIDTH,
-  never shrunk, never side-cropped: the speaker's face is found once (Vision matte) and the slide distance puts it centred in the
-  section under the insert (face centre <= 1300 so the chin clears the subtitle); the subtitle moves just under the chin, inside the
-  safe area. The user rejected the old shrink-to-bottom with blurred side bars ("zooming me out"); `push=<factor>` remains only for
-  a deliberate special case. `--cue` prints the detected face line and each window's slide distance; `CFG["face_y"]` overrides.
+  never shrunk, never side-cropped. The head top is found once (Vision matte) and the slide distance puts it 36 px under the
+  insert, so the footage is cropped at the top as well as the bottom and there is no dead space above the head; the subtitle moves
+  under the chin, inside the safe area. The slide takes 0.24 s and the insert SNAPS in during it (`anim="snap"` is forced for pan
+  windows; a slow dissolve reads as lag): no blurred or dark strip is ever seen on its own. The user rejected the old shrink with
+  blurred side bars and the slow blurred lead-in; `push=<factor>` remains only for a deliberate special case. `--cue` prints the
+  head line and each window's slide distance; `CFG["face_y"]` / `CFG["head_top"]` override.
 - Half-screen footage windows carry a soft dark gradient at the top (automatic) so the phrase stays readable over light films.
 - **Transitions on B-roll**: `dissolve` only. No `leak()` (film burns are off by default; the user dislikes the light wash), no flashes.
 
