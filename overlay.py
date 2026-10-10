@@ -1171,15 +1171,34 @@ def pick_mood(caps, tone="warm"):
     if tone == "calm": return "lofi" if best in ("lofi", "upbeat", "tech") else "cinematic"
     return {"upbeat": "upbeat", "tech": "tech", "lofi": "lofi", "cinematic": "cinematic", "dramatic": "trailer"}.get(best, "hiphop")
 
+def liked_track(CFG, DUR, mood, force=False):
+    """A LICENSED file the user placed in <skill>/music/liked/ whose TASTE.json moods include `mood` (any liked track when force).
+    The skill never downloads commercial recordings; this folder is where the user's own licensed copies live."""
+    d = HERE / "music" / "liked"; audio = [f for f in d.glob("*") if f.suffix.lower() in (".mp3", ".wav", ".m4a", ".aif", ".aiff", ".flac")] if d.exists() else []
+    if not audio: return None
+    try: taste = json.loads((d / "TASTE.json").read_text()).get("tracks", [])
+    except Exception: taste = []
+    def moods(f): return next((tr["moods"] for tr in taste if tr["title"].lower() in f.stem.lower()), [])
+    fit = [f for f in audio if mood in moods(f)] or ([f for f in audio if moods(f) and mood in ("upbeat", "lofi", "tech", "cinematic") and set(moods(f)) & {"upbeat", "lofi", "tech", "cinematic"}])
+    pool = fit or (audio if force else [])
+    if not pool: return None
+    durs = {f: duration(f) for f in pool}; ranked = sorted(pool, key=lambda f: (durs[f] < DUR, -durs[f]))
+    return ranked[sum(map(ord, CFG["name"])) % min(3, len(ranked))]
+
 def music_bed(CFG, OUT, DUR, caps):
-    """The background music file for this reel, looped/trimmed to DUR. CFG['music']: None/False (no music), 'auto' (mood from the
-    transcript), a mood name, or a path to a track. A real track from CFG['music_lib']/<mood>/ wins over the procedural composer."""
+    """The background music file for this reel, looped/trimmed to DUR. CFG['music']: None/False (no music: the user adds a licensed song
+    in the Instagram app), 'auto' (mood from the transcript; the user's licensed tracks in music/liked/ win when their moods fit),
+    'liked' (force a liked track), a mood name, or a path to a track. A real track from CFG['music_lib']/<mood>/ wins over the composer."""
     m = CFG.get("music")
     if not m: return None, None
     p = pathlib.Path(str(m)).expanduser()
+    tone = CFG.get("_tone", {}).get("tone", "warm")
+    liked = liked_track(CFG, DUR, pick_mood(caps, tone) if m in ("auto", "liked") else str(m), force=(m == "liked"))
     if p.suffix and p.exists(): src, label = p, p.name
+    elif liked: src, label = liked, f"liked: {liked.name} (the user's preferred track)"
     else:
-        tone = CFG.get("_tone", {}).get("tone", "warm"); mood = pick_mood(caps, tone) if m == "auto" else str(m)
+        if m == "liked": print("music: no licensed file in music/liked/ fits; falling back to the collection (never downloading the original)")
+        mood = pick_mood(caps, tone) if m in ("auto", "liked") else str(m)
         libs = [pathlib.Path(CFG["music_lib"]).expanduser()] if CFG.get("music_lib") else []
         libs += [HERE / "music", pathlib.Path("~/reel-music").expanduser()]          # the skill's Pixabay collection, then the user's own
         tracks = sorted({f for lib in libs for f in (lib / mood).glob("*") if f.suffix.lower() in (".mp3", ".wav", ".m4a", ".aif", ".aiff", ".flac")} if True else [])
@@ -1374,46 +1393,60 @@ PY_DOUT = dict(snap=.08, fade=.14, pop=.16, cut=0, up=.3, down=.3, left=.3, righ
 PY_DIN = dict(snap=.08, pop=.22, fade=.22, up=.38, down=.38, left=.42, right=.42, wipe=.28, none=0, zoom=.45, slam=.3, flip=.5, iris=.5, spin=.5, bounce=.6, blur=.4, rise=.45, type=0, dissolve=.55)
 SMOOTH = 1.0
 
-def face_y(CFG, CUT, OUT, W, H, at):
-    """Vertical centre of the speaker's face (1920-scale px) at time `at`, from the Vision person matte: head top + ~230 px.
-    CFG["face_y"] overrides; cached per cut in <out>/face.json."""
-    if CFG.get("face_y"): return dict(face=float(CFG["face_y"]), top=float(CFG.get("head_top", CFG["face_y"] - 230)))
-    f = OUT / "face.json"; sig = f"{pathlib.Path(CUT).stat().st_mtime}_{pathlib.Path(CUT).stat().st_size}_{at:.2f}"
-    try:
-        c = json.loads(f.read_text())
-        if c.get("sig") == sig and "top" in c: return dict(face=c["face_y"], top=c["top"])
-    except Exception: pass
-    fy, top = 480.0, 250.0
+PAN_GAP = 60   # px between the insert's bottom edge and the highest head position inside the window (the user wants little air over the head)
+
+def head_profile(CFG, CUT, OUT, at):
+    """Head top, chin and face centre (1920-scale px) at time `at`, from the Vision person matte: top = first row with the person,
+    chin = the narrowest row (the neck) between top+200 and top+700, face = midway. CFG["head_top"]/CFG["chin"] override; cached per cut and time."""
+    if CFG.get("head_top"): top = float(CFG["head_top"]); chin = float(CFG.get("chin", top + 470)); return dict(top=top, chin=chin, face=(top + chin) / 2)
+    f = OUT / "face.json"; sig = f"{pathlib.Path(CUT).stat().st_mtime}_{pathlib.Path(CUT).stat().st_size}"
+    try: cache = json.loads(f.read_text())
+    except Exception: cache = {}
+    if cache.get("sig") != sig: cache = {"sig": sig}
+    key = f"{at:.2f}"
+    if key in cache: return cache[key]
+    top, chin = 250.0, 720.0
     try:
         import tempfile, shutil
         tmp = pathlib.Path(tempfile.mkdtemp())
         subprocess.run([str(segment_bin()), str(CUT), f"{at:.2f}", f"{at + .05:.2f}", "1", str(tmp), "1"], check=True, capture_output=True)
-        m = next(tmp.glob("*.png"))
-        NW = 48   # 48 columns x all rows: a row holds the person if ANY column is bright (an average would miss a narrow head top)
+        m = next(tmp.glob("*.png")); NW = 48
         raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(m), "-vf", f"format=gray,scale={NW}:ih:flags=area", "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, check=True).stdout
-        nrows = len(raw) // NW
-        rows = [i for i in range(nrows) if max(raw[i * NW:(i + 1) * NW]) > 110]
-        if rows:
-            top = rows[0] / nrows * 1920
-            fy = min(900.0, max(300.0, top + 230))
+        n = len(raw) // NW; rows = [raw[i * NW:(i + 1) * NW] for i in range(n)]
+        bright = [i for i, r in enumerate(rows) if max(r) > 110]
+        if bright:
+            top = bright[0] / n * 1920
+            width = [sum(1 for v in r if v > 110) for r in rows]
+            lo, hi = int((top + 200) / 1920 * n), min(n - 1, int((top + 700) / 1920 * n))
+            if hi > lo:
+                neck = min(range(lo, hi), key=lambda i: width[i]); chin = neck / n * 1920 - 20
+            else: chin = top + 470
         shutil.rmtree(tmp, ignore_errors=True)
-    except Exception as e: print(f"  face: Vision matte failed ({e}), assuming face at y 480")
-    f.write_text(json.dumps(dict(sig=sig, face_y=fy, top=top))); return dict(face=fy, top=top)
+    except Exception as e: print(f"  head: Vision matte failed at {at:.2f}s ({e}), assuming top 250 / chin 720")
+    prof = dict(top=round(top), chin=round(chin), face=round((top + chin) / 2)); cache[key] = prof; f.write_text(json.dumps(cache)); return prof
+
+def face_y(CFG, CUT, OUT, W, H, at):
+    pr = head_profile(CFG, CUT, OUT, at); return dict(face=pr["face"], top=pr["top"])
 
 def pan_setup(CFG, ITEMS, CUT, OUT, W, H):
-    """The standard top-half layout: the footage keeps its full width and slides down by T px (never scaled, never side-cropped), so the
-    face is visible and centred in the section under the B-roll (face centre <= 1300 so the chin clears the subtitle); the subtitle moves
-    just under the chin, inside the safe area. T is clamped to the window's bottom edge so no gap opens between B-roll and footage."""
+    """The standard top-half layout: the footage keeps its full width and slides down by T px (never scaled, never side-cropped). For
+    every top-half window the head is measured at three moments (start, middle, end); the slide puts the HIGHEST head position PAN_GAP px
+    under the insert, so the head is never clipped and never has much air above it; the subtitle sits under the lowest chin, inside the
+    safe area. T is clamped to the insert's bottom edge so no gap opens between B-roll and footage."""
     pans = [it for it in ITEMS if it["kind"] == "window" and it.get("push") == "pan"]
     if not pans: return
-    F = face_y(CFG, CUT, OUT, W, H, pans[0]["a"]); fy, top = F["face"], F["top"]
+    rep = []
     for it in pans:
         bottom = it["y"] + it["h"]
-        T = int(max(0, min(bottom, bottom - top + 36)))   # head top lands 36 px under the insert: cropped at the top as well, no dead wall above the head
+        ts = [it["a"] + .1, (it["a"] + it["b"]) / 2, max(it["a"] + .1, it["b"] - .1)]
+        profs = [head_profile(CFG, CUT, OUT, s) for s in ts]
+        top = min(pr["top"] for pr in profs); chin = max(pr["chin"] for pr in profs)
+        T = int(max(0, min(bottom, bottom + PAN_GAP - top)))
         it["pan"] = T
-        if it.get("cap_y") is None or it["cap_y"] == 1420: it["cap_y"] = int(min(1535, max(1100, fy + T + 250)))
-    CFG["_pan"] = dict(face_y=fy, head_top=top, T=[it["pan"] for it in pans])
-    print(f"layout: head top y {top:.0f}, face y {fy:.0f}; top-half windows slide the footage down " + ", ".join(f"{it['id']}={it['pan']}px" for it in pans) + f" so the head sits right under the insert (full width, {PAN_D}s slide)")
+        if it.get("cap_y") is None or it["cap_y"] == 1420: it["cap_y"] = int(min(1535, max(1100, chin + T + 70)))
+        rep.append(f"{it['id']}: head {top:.0f}-{chin:.0f} -> slide {T}px, air over head {top + T - bottom:.0f}px, subtitle y {it['cap_y']}")
+    CFG["_pan"] = {it["id"]: it["pan"] for it in pans}
+    print("layout: top-half windows slide the footage down at full width (" + f"{PAN_D}s): " + "; ".join(rep))
 
 def push_ranges(ITEMS):
     """Footage-shrink ranges per push factor. The layout change never overlaps the window's own fade: the footage shrinks BEFORE the

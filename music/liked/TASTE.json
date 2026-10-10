@@ -1,0 +1,125 @@
+{
+ "_note": "The user's preferred songs (2026-10-11). Commercial recordings are NEVER downloaded by the skill. Drop LICENSED files of these into music/liked/ (any name containing the title) and music_bed prefers them; otherwise the moods here steer the royalty-free pick, or render with music=None and add the song in the Instagram app.",
+ "tracks": [
+  {
+   "title": "Karen 3",
+   "moods": [
+    "lofi",
+    "tech"
+   ],
+   "feel": "soft synth, nostalgic"
+  },
+  {
+   "title": "New Home",
+   "moods": [
+    "cinematic",
+    "lofi"
+   ],
+   "feel": "calm, piano, dreamy"
+  },
+  {
+   "title": "Ylang Ylang",
+   "moods": [
+    "lofi",
+    "upbeat"
+   ],
+   "feel": "neo-soul, warm groove"
+  },
+  {
+   "title": "ELBM",
+   "moods": [
+    "lofi",
+    "tech"
+   ],
+   "feel": "dreamy electronic"
+  },
+  {
+   "title": "Dark Red",
+   "moods": [
+    "lofi",
+    "upbeat"
+   ],
+   "feel": "indie R&B, bedroom pop"
+  },
+  {
+   "title": "New Computers",
+   "moods": [
+    "tech",
+    "lofi"
+   ],
+   "feel": "soft synth, melancholic"
+  },
+  {
+   "title": "CYHTM",
+   "moods": [
+    "lofi",
+    "upbeat"
+   ],
+   "feel": "dreamy indie"
+  },
+  {
+   "title": "Summer",
+   "moods": [
+    "upbeat",
+    "lofi"
+   ],
+   "feel": "warm, summery"
+  },
+  {
+   "title": "Deep Space Samurai",
+   "moods": [
+    "trailer",
+    "cinematic"
+   ],
+   "feel": "dark cinematic, space"
+  },
+  {
+   "title": "Skyfall",
+   "moods": [
+    "trailer",
+    "cinematic"
+   ],
+   "feel": "dramatic, orchestral"
+  },
+  {
+   "title": "Missing Textures",
+   "moods": [
+    "tech",
+    "lofi"
+   ],
+   "feel": "soft synth, textured"
+  },
+  {
+   "title": "Runaway",
+   "moods": [
+    "hiphop",
+    "trailer"
+   ],
+   "feel": "dramatic, piano + beat"
+  },
+  {
+   "title": "Peer Pressure",
+   "moods": [
+    "upbeat",
+    "lofi"
+   ],
+   "feel": "warm pop, intimate"
+  },
+  {
+   "title": "Mrs Magic",
+   "moods": [
+    "lofi",
+    "upbeat"
+   ],
+   "feel": "dreamy indie, soft"
+  },
+  {
+   "title": "Dimensions",
+   "moods": [
+    "cinematic",
+    "tech"
+   ],
+   "feel": "cinematic synth"
+  }
+ ]
+}

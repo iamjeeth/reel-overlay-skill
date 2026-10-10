@@ -36,6 +36,14 @@ custom, before storyboarding. Sometimes simple is right.
 Headline hero words react: they slam in with a flash and the neighbouring words bump; captions pop; bars, counters, flow nodes and
 cards overshoot. All of it scales with the theme's amplitude, so `simple` stays quiet and `duotone` shouts. `--cue` prints the theme.
 
+## Music the user likes (music/liked/)
+`music/liked/TASTE.json` lists the user's preferred songs with the skill moods they stand in for (dreamy indie R&B and soft synth ->
+lofi / upbeat / tech; Skyfall, Deep Space Samurai, Dimensions, Runaway -> trailer / cinematic). The skill NEVER downloads commercial
+recordings (copyright; the reel would be muted or taken down). When the user has placed a LICENSED file of one of them in
+`music/liked/`, `music="auto"` prefers it whenever the reel's mood matches and `music="liked"` forces it. Otherwise the royalty-free
+collection is used in that register, or the reel is rendered with `music=None` and the user adds the song in the Instagram app,
+which carries the licence. Say which of these happened in the cue sheet.
+
 ## Thumb rule: when in doubt, ask (before spending tokens)
 Whenever something about the video is unclear or two directions look equally right (which cut is the hook, which B-roll film or
 scene, which image or icon, caption style or wording, headline copy, which music mood or SFX palette, where a window may sit,
@@ -284,9 +292,10 @@ motion graphic by hand when a showcase video of the technology exists online.
 - One-spot fix after a code or config change: delete the affected frames in `out/frames_fg_*` and run with `REEL_KEEP_CACHE=1`
   so the untouched frames are reused.
 - **Top-half layout standard (`preset="tophalf"`)**: the B-roll fills the top 800 px and the FOOTAGE SLIDES DOWN AT FULL WIDTH,
-  never shrunk, never side-cropped. The head top is found once (Vision matte) and the slide distance puts it 36 px under the
-  insert, so the footage is cropped at the top as well as the bottom and there is no dead space above the head; the subtitle moves
-  under the chin, inside the safe area. The slide takes 0.24 s and the insert SNAPS in during it (`anim="snap"` is forced for pan
+  never shrunk, never side-cropped. For EVERY top-half window the head is measured at three moments (Vision matte: top and chin);
+  the slide distance puts the highest head position 60 px under the insert (`PAN_GAP`), so the footage is cropped at the top as
+  well as the bottom, the head is never clipped and there is no air above it (the user's limit: well under 15% of the half screen);
+  the subtitle sits 70 px under the lowest chin, inside the safe area. Speakers drift between windows, so one measurement is not enough. The slide takes 0.24 s and the insert SNAPS in during it (`anim="snap"` is forced for pan
   windows; a slow dissolve reads as lag): no blurred or dark strip is ever seen on its own. The user rejected the old shrink with
   blurred side bars and the slow blurred lead-in; `push=<factor>` remains only for a deliberate special case. `--cue` prints the
   head line and each window's slide distance; `CFG["face_y"]` / `CFG["head_top"]` override.

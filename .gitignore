@@ -5,3 +5,7 @@ __pycache__/
 # brand/ is a per-script cache (logos, films), never shipped
 brand/*
 !brand/.gitkeep
+# the user's own licensed songs stay local
+music/liked/*
+!music/liked/TASTE.json
+!music/liked/README.md
