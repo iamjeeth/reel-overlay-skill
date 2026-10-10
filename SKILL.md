@@ -68,7 +68,7 @@ build exactly what was chosen. A wrong guess costs a full re-render; a question 
    `whisper audio.wav --model small --language en --word_timestamps True --output_format json --output_dir .`
    The renderer refuses a transcript older than the cut (a replaced file means new words); re-run whisper then.
    Run `python3 <skill>/overlay.py reel.py --dry`, read every word, fix mishearings with `fixes` (single word) and `merges`
-   (token runs, e.g. `(("design","md"), "Design.md")`). Product names, URLs, numbers and the comment keyword are where whisper fails.
+   (token runs, matched LOWER-CASED, e.g. `(("design","md"), "Design.md")`, `(("notebook","lm"), "NotebookLM")`). Product names, URLs, numbers and the comment keyword are where whisper fails.
 4. **Look at the footage cheaply**: ONE contact sheet (a frame every 2 s: `-vf fps=0.5,scale=135:240,tile=15x2`) plus scene cuts
    (`-vf "select='gt(scene,0.2)',showinfo" -f null -`). Note where the head, hands and laptop sit so windows and stickers don't cover the face.
 5. **Title**: two short lines, line 2 is the accent line (the payoff: "Websites With AI"). Offer 3 options (widest audience /

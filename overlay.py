@@ -1621,7 +1621,8 @@ def broll_report(ITEMS, DUR):
         except Exception: continue
         up = max(it["w"] / sw, it["h"] / sh) if it.get("fit", "cover") == "cover" else it["w"] / sw
         if up > 1.15: flags.append(f"{it['id']} upscaled x{up:.2f} ({sw}x{sh} into {it['w']}x{it['h']}): use half-screen or a 4K/portrait source")
-        if min(sw, sh) < 2160 and max(sw, sh) < 3840: flags.append(f"{it['id']} source is {sw}x{sh}, not ultra HD (B-roll sources must be 4K: brand_collect.py fetches 2160p first)")
+        if min(sw, sh) < 2160 and max(sw, sh) < 3840 and not (globals().get("_CFG_FOR_REPORT") or {}).get("allow_hd"):
+            flags.append(f"{it['id']} source is {sw}x{sh}, not ultra HD (B-roll sources must be 4K: brand_collect.py fetches 2160p first; when no 4K film exists, ASK the user and set CFG allow_hd=True for half-screen, never upscaled, use)")
     print(f"B-roll: {tot:.1f}s of {DUR:.1f}s = {cov:.0f}% | {len(W_)} windows, {min(it['b'] - it['a'] for it in W_):.1f}-{max(it['b'] - it['a'] for it in W_):.1f}s | half {L['half'] / ls * 100:.0f}% full {L['full'] / ls * 100:.0f}% behind {L['behind'] / ls * 100:.0f}% | real {real / rs * 100:.0f}% animation {anim / rs * 100:.0f}%")
     print("B-roll standard: OK" if not flags else "B-roll standard: FIX -> " + "; ".join(flags))
 
