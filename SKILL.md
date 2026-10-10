@@ -31,7 +31,10 @@ the skill proposes the fit for THIS video (tone, topic, speaker, brands) and ask
 custom, before storyboarding. Sometimes simple is right.
 - `lime`: lime #D4FF3F and white on near-black, one hot coral accent, bold kinetic type, exaggerated overshoot (over 2.3, amp 1.0).
 - `duotone`: electric yellow #FFE600 stages with violet #5B3DF5 accents, inverted per scene, loudest motion (over 2.6, amp 1.2).
-- `brand`: dark base, accent taken from the product being discussed (`CFG["brand_color"]`), text colour auto by luminance (over 2.0).
+- `brand`: dark base, accent taken from the product being discussed: `CFG["brand_color"]` for the whole reel, or per section
+  `CFG["brand_segments"]=[(a, b, "#hex"), ...]` so each tool's part takes its own colour (hero words, caption accents, scene
+  accents, canvas cards); text colour auto by luminance, a dark brand colour falls back to pale yellow for the hero word (over 2.0).
+  `allow_hd=True` + `broll_anim_min=<n>` when the user has asked for the tools' official 1080p films throughout (half-screen only).
 - `simple`: the calm premium reference: pale yellow accents, yellow editorial cards, soft pops (over 1.7, amp .5).
 Headline hero words react: they slam in with a flash and the neighbouring words bump; captions pop; bars, counters, flow nodes and
 cards overshoot. All of it scales with the theme's amplitude, so `simple` stays quiet and `duotone` shouts. `--cue` prints the theme.

@@ -34,6 +34,19 @@ THEMES = {
                     stage="#FED400", fg="#231D23", stageacc="#231D23", hot="#ff5a5a", card="#121014", cardfg="#ffffff", cardline="#EEFB00", over=1.7, amp=.5),
 }
 
+def _lum(hexc):
+    r_, g_, b_ = (int(hexc.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)); return .299 * r_ + .587 * g_ + .114 * b_
+
+def brand_segments(CFG, th):
+    """CFG["brand_segments"] = [(a, b, "#hex"), ...]: in a brand-driven reel each section takes the colour of the product it is about.
+    Returns the per-segment overrides the page applies while t is inside the range (accent, hero, stage accent, card, text on accent)."""
+    out = []
+    for a, b, col in CFG.get("brand_segments") or []:
+        dark = _lum(col) < 140; ink = "#F4F4F6" if dark else "#0B0B0F"
+        hero = col if _lum(col) > 110 else "#FDF29E"   # a dark brand colour cannot be the hero word over footage: fall back to the pale yellow
+        out.append(dict(a=float(a), b=float(b), acc=col, acc2=col, hero=hero, ink=ink, stageacc=col, card=col, cardfg=ink, cardline=ink, hot=th["hot"]))
+    return out
+
 def theme_of(CFG):
     """The reel's theme dict. CFG["theme"] = "lime" | "duotone" | "brand" | "simple" (asked per reel); "brand" takes CFG["brand_color"]."""
     name = CFG.get("theme")
@@ -650,6 +663,10 @@ JS = r"""<script>
 const CAPS=__CAPS__, ITEMS=__ITEMS__, CFG=__CFG__, MEDIA=__MEDIA__, SAFE=__SAFE__;
 const cl=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)), ease=p=>1-Math.pow(1-cl(p),3), eio=p=>{p=cl(p);return p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2};
 const OVER=(window.THEME||{}).over||1.7, AMP=(window.THEME||{}).amp??1;   // exaggeration comes from the reel's theme
+let _segKey='';
+function applyTheme(t){ const T=window.THEME||{}, seg=(T.segments||[]).find(s=>t>=s.a&&t<s.b)||null, th=seg?Object.assign({},T,seg):T, k=seg?seg.acc:'base'; if(k===_segKey) return k; _segKey=k;
+  const st=document.documentElement.style; st.setProperty('--acc',th.acc); st.setProperty('--acc2',th.acc2||th.acc); st.setProperty('--hero',th.hero); st.setProperty('--herosh',th.heroshadow||'none'); st.setProperty('--ink',th.ink); st.setProperty('--bg',th.bg);
+  if(window.MOTION&&window.MOTION.setTheme) window.MOTION.setTheme(th); return k; }
 const back=(p,c=OVER)=>{p=cl(p);return 1+(c+1)*Math.pow(p-1,3)+c*Math.pow(p-1,2)};
 const r=v=>Math.round(v*1000)/1000, $=id=>document.getElementById(id);
 const DIN={snap:.08,pop:.22,fade:.22,up:.38,down:.38,left:.42,right:.42,wipe:.28,none:0,zoom:.45,slam:.3,flip:.5,iris:.5,spin:.5,bounce:.6,blur:.4,rise:.45,type:0,dissolve:.55},
@@ -849,9 +866,9 @@ function leakRender(it,t){ const el=$(it.id), p=cl((t-it.a)/it.dur), peak=Math.p
   el.style.background=`radial-gradient(ellipse at ${30+p*40}% ${40}%, rgba(${c2},${(peak*1.1).toFixed(3)}) 0%, rgba(${c2},${(peak*.9).toFixed(3)}) 35%, rgba(${mix},${(peak*.85).toFixed(3)}) 70%, rgba(${mix},${(peak*.6).toFixed(3)}) 100%)`;
   el.style.opacity=r(Math.min(1,peak*1.15)); return r(p); }
 let lastCap=null, pending=[];
-async function render(t,layer){
+async function render(t,layer){ const _tk=applyTheme(t);
   if(!window._imgsReady){ window._imgsReady=true; const ims=[]; for(const it of ITEMS) if(it.kind==='window'&&it.scene) for(const v of Object.values(it.scene)) { const add=u=>{ if(typeof u==='string'&&u.startsWith('file:')){const im=new Image(); im.src=u; ims.push(im.decode().catch(()=>{}));} }; Array.isArray(v)?v.forEach(add):add(v); } await Promise.all(ims); }
-  const K=[layer||'']; let capY=CFG.cap_y, hideCap=CFG.cap_mode==='off', fullUp=false;
+  const K=[layer||'',_tk]; let capY=CFG.cap_y, hideCap=CFG.cap_mode==='off', fullUp=false;
   if(layer==='bg') hideCap=true;
   if(CFG.title){const T=CFG.title, el=$('title'), on=t>=T.t[0]&&t<T.t[1], pin=cl((t-T.t[0])/.25), pout=cl((T.t[1]-t)/.15);
     const op=on&&layer!=='bg'?Math.min(cl(pin*2),pout):0; el.style.opacity=r(op); el.style.transform=`scale(${r(.94+.06*back(pin))})`; K.push(r(op),el.style.transform);}
@@ -913,9 +930,11 @@ def page(CFG, ITEMS, MEDIA, caps):
     js = (JS.replace("__CAPS__", json.dumps([] if CFG.get("captions") is False else caps)).replace("__ITEMS__", json.dumps(ITEMS)).replace("__CFG__", json.dumps(cfg))
           .replace("__MEDIA__", json.dumps(MEDIA)).replace("__SAFE__", json.dumps(SAFE)))
     motion = (HERE / "motion.js").read_text() if (HERE / "motion.js").exists() else ""
-    th = theme_of(CFG); css = (CSS.replace("ACC2", th["acc2"]).replace("HEROSH", th["heroshadow"]).replace("HERO", th["hero"]).replace("ACC", th["acc"]).replace("LIME", th["hero"])
-                               .replace("INK", th["ink"]).replace("BGC", th["bg"]))
-    return f"<!doctype html><html><head><meta charset='utf-8'><style>{css}</style></head><body>{body(CFG, ITEMS, MEDIA)}<script>window.THEME={json.dumps(th)}</script><script>{motion}</script>{js}</body></html>"
+    th = theme_of(CFG); th["segments"] = brand_segments(CFG, th)
+    css = (CSS.replace("ACC2", "var(--acc2)").replace("HEROSH", "var(--herosh)").replace("HERO", "var(--hero)").replace("ACC", "var(--acc)").replace("LIME", "var(--hero)")
+              .replace("INK", "var(--ink)").replace("BGC", "var(--bg)"))
+    root = f":root{{--acc:{th['acc']};--acc2:{th['acc2']};--hero:{th['hero']};--herosh:{th['heroshadow']};--ink:{th['ink']};--bg:{th['bg']}}}"
+    return f"<!doctype html><html><head><meta charset='utf-8'><style>{root}{css}</style></head><body>{body(CFG, ITEMS, MEDIA)}<script>window.THEME={json.dumps(th)}</script><script>{motion}</script>{js}</body></html>"
 
 # ============================ SFX ============================
 SYNTH = {   # ffmpeg recipes used when the library has no file for a name. Deliberately small, dark and short: UI sounds, not trailer hits.
@@ -1599,7 +1618,8 @@ def broll_report(ITEMS, DUR):
     flags = []
     if not 20 <= cov <= 36: flags.append(f"coverage {cov:.0f}% (standard 25-30%)")
     if len(W_) > max(3, round(DUR / 8)): flags.append(f"{len(W_)} windows (standard <= {max(3, round(DUR / 8))} for {DUR:.0f}s)")
-    if anim / rs * 100 < 30: flags.append(f"motion-graphic B-roll {anim / rs * 100:.0f}% (the skill's set pieces are B-roll too: >= 30%, ~half)")
+    amin = (globals().get("_CFG_FOR_REPORT") or {}).get("broll_anim_min", 30)
+    if anim / rs * 100 < amin: flags.append(f"motion-graphic B-roll {anim / rs * 100:.0f}% (the skill's set pieces are B-roll too: >= {amin}%, ~half; when the user asked for official films throughout, set broll_anim_min lower and say so)")
     short = [it["id"] for it in W_ if it["b"] - it["a"] < 1.9]; long_ = [it["id"] for it in W_ if it["b"] - it["a"] > 6.1]
     if short: flags.append("shorter than 2 s: " + ", ".join(short))
     if long_: flags.append("longer than 6 s: " + ", ".join(long_))

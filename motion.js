@@ -1,14 +1,14 @@
 // Motion-graphics set pieces, drawn on canvas per frame. Loaded into the overlay page; each kind = {build(el,c), update(el,c,u)}.
 // Shared style: dark stage, accent #FDF29E, SF type, depth (scale/blur by z), light sweeps, vignette, film grain. u = seconds since in.
 (function(){
-const T=window.THEME||{}; const ACC=T.acc||'#FDF29E', WHITE='#fff', GREY='#9aa0ad', RED=T.hot||'#ff5a5a', GREEN='#7ddc8a', BLUE='#6bcbff'; const OVER=T.over||1.7, AMP=T.amp??1;   // palette + exaggeration from the reel's theme
+let T=window.THEME||{}; let ACC=T.acc||'#FDF29E'; const WHITE='#fff', GREY='#9aa0ad'; let RED=T.hot||'#ff5a5a'; const GREEN='#7ddc8a', BLUE='#6bcbff'; const OVER=T.over||1.7, AMP=T.amp??1;   // palette + exaggeration from the reel's theme
 const cl=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)), ease=p=>1-Math.pow(1-cl(p),3), eio=p=>{p=cl(p);return p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2};
 const back=(p,c=OVER)=>{p=cl(p);return 1+(c+1)*Math.pow(p-1,3)+c*Math.pow(p-1,2)};
 const rnd=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
 const FONT=(px,w=700)=>`${w} ${px}px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif`;
 const HERO=(px,w=700)=>`${w} ${px}px "Helvetica Neue", Helvetica, Arial, sans-serif`, SERIF=px=>`italic 400 ${px}px NYI, "New York", Georgia, serif`;
-const YEL=T.stage||'#FED400', INK=T.fg||'#231D23', LIME=T.stageacc||T.acc||'#EEFB00', HOT=T.hot||'#ff5a5a', CARD=T.card||'#121014', CARDFG=T.cardfg||'#fff', CARDLINE=T.cardline||'#EEFB00', CARDMUTE=T.cardfg&&T.cardfg!=='#ffffff'?'#3a3a40':'#9aa0ad';
-const ACCR=(()=>{const h=ACC.replace('#',''); return `${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)}`;})(); const accA=a=>`rgba(${ACCR},${a})`;
+let YEL=T.stage||'#FED400', INK=T.fg||'#231D23', LIME=T.stageacc||T.acc||'#EEFB00', HOT=T.hot||'#ff5a5a', CARD=T.card||'#121014', CARDFG=T.cardfg||'#fff', CARDLINE=T.cardline||'#EEFB00', CARDMUTE=T.cardfg&&T.cardfg!=='#ffffff'?'#3a3a40':'#9aa0ad';
+const accA=a=>{const h=ACC.replace('#',''); return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;};
 function ytext(g,s,x,y,px,color=INK,align='center',font=null,alpha=1,ls=0){ g.save(); g.globalAlpha=alpha; g.font=font||HERO(px,700); g.fillStyle=color; g.textAlign=align; g.textBaseline='middle'; if(ls){ g.letterSpacing=ls+'px'; } g.fillText(s,x,y); g.restore(); }
 function ypill(g,x,y,s,px,bg,fg,font=null){ g.save(); g.font=font||HERO(px,700); const w=g.measureText(s).width+px*1.3,h=px*1.75; rr(g,x-w/2,y-h/2,w,h,h/2); g.fillStyle=bg; g.fill(); ytext(g,s,x,y+1,px,fg,'center',font); g.restore(); return w; }
 function emojiIcon(g,x,y,r,e,bg=INK){ g.save(); g.fillStyle=bg; g.beginPath(); g.arc(x,y,r,0,6.283); g.fill(); g.font=`${r*1.05}px -apple-system`; g.textAlign='center'; g.textBaseline='middle'; g.fillText(e,x,y+r*.08); g.restore(); }
@@ -135,5 +135,6 @@ typo:{build:(el,c)=>setup(el), update:(el,c,u)=>{ const [g,W,H]=ctx(el); stage(g
   if(p2>0){ glow(g,W/2,H*.56,W*.6,accA(.22)); g.save(); g.shadowColor=accA(.8); g.shadowBlur=30; text(g,b,W/2,H*.56,W*.19*(1+(1.4+.4*AMP)*(1-back(p2,1+.6*AMP))),ACC,'center',900); g.restore(); text(g,c.sub||'',W/2,H*.7,W*.03,WHITE,'center',600,cl((p2-.6)/.4)); } vignette(g,W,H,.5); return r3(u); }},
 };
 const r3=v=>Math.round(v*1000)/1000;
+M.setTheme=th=>{ T=th; ACC=th.acc||ACC; RED=th.hot||RED; YEL=th.stage||YEL; INK=th.fg||INK; LIME=th.stageacc||th.acc||LIME; HOT=th.hot||HOT; CARD=th.card||CARD; CARDFG=th.cardfg||CARDFG; CARDLINE=th.cardline||CARDLINE; CARDMUTE=th.cardfg&&th.cardfg!=='#ffffff'?'#3a3a40':'#9aa0ad'; };
 window.MOTION=M;
 })();
