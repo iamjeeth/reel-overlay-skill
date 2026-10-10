@@ -39,7 +39,7 @@ PRESETS = dict(
     stackA=dict(x=-40, y=400, w=600, h=400, cap_y=None),       # three-screen "gallery" look (use with stackB/C)
     stackB=dict(x=560, y=620, w=560, h=380, cap_y=None),
     stackC=dict(x=230, y=1220, w=560, h=340, cap_y=None),
-    tophalf=dict(x=0, y=0, w=1080, h=880, cap_y=1420, radius=0, push=.72),   # B-roll fills the top half, footage shrinks to the bottom
+    tophalf=dict(x=0, y=0, w=1080, h=800, cap_y=1420, radius=0, push="pan"),  # B-roll fills the top; the footage slides DOWN at full width (no side crop), face centred in the bottom section
     full=dict(x=0, y=0, w=1080, h=1920, cap_y=1420, radius=0),               # full-frame insert for a breath / topic change (1-2.5 s)
     behind=dict(x=0, y=0, w=1080, h=1920, cap_y=None, radius=0, person=True),     # B-roll BEHIND the speaker: full background, person cut out (Vision matte) over it
     behindtop=dict(x=0, y=0, w=1080, h=1240, cap_y=None, radius=0, person=True),  # same, but the B-roll fades out behind the chest so the real room stays below
@@ -279,6 +279,8 @@ def scene(id, kind, preset=None, t=(0, 1), x=None, y=None, w=None, h=None, blur=
       progress  title='Claude', model='Opus 5 · High', prompt='Create a 15 s video of …', label='Generating', to=100, duration=3, lines=['Shot 1 of 4', …]
       browser extras: toast='🚀 Deployed', cursor=True (a cursor flies in and clicks the button, then the toast pops)
     Windows on `tophalf`/`full` drift (slow 3.5% zoom) so even a finished scene keeps breathing; set drift=False to stop it.
+    push="pan" (the tophalf standard): the footage slides down at full width so the face is centred under the insert, never shrunk or
+    side-cropped; push=<0..1> is the old shrink-to-bottom layout, kept for special cases only.
     Extra window options (radius, push, cap_y, frame, tilt, sfx, vol) pass through."""
     wopts = {k: cfg.pop(k) for k in list(cfg) if k in ("radius", "push", "cap_y", "frame", "tilt", "sfx", "vol", "shadow", "dist", "drift")}
     def uri(v): return img_uri(v) if isinstance(v, pathlib.Path) else [uri(x) for x in v] if isinstance(v, list) else {k: uri(x) for k, x in v.items()} if isinstance(v, dict) else v
@@ -1234,7 +1236,9 @@ def mattes(ITEMS, CUT, OUT, FPS, DUR, W, H, at=None):
     if not black.exists(): ff("-f", "lavfi", "-i", f"color=c=black:s={W // 2}x{H // 2}", "-frames:v", "1", "-pix_fmt", "rgb24", black)   # same format as the Vision mattes: a format change mid-sequence re-inits the ffmpeg graph and drops frames
     bi = black.stat().st_ino
     def have(i): f = d / f"{i:05d}.png"; return f.exists() and f.stat().st_ino != bi   # a frame hard-linked to black is a placeholder, not a matte
-    rg = [(max(0, at - .02), at + .05)] if at is not None else person_ranges(ITEMS)
+    if at is not None:   # a still: cut the speaker out only where the final does (inside a behind window), else the still would hide the pan
+        rg = [(max(0, at - .02), at + .05)] if any(a <= at < b for a, b in person_ranges(ITEMS)) else []
+    else: rg = person_ranges(ITEMS)
     for a, b in rg:
         need = [i for i in range(int(a * FPS), min(n, int(b * FPS) + 1)) if not have(i)]
         for i in need: (d / f"{i:05d}.png").unlink(missing_ok=True)
@@ -1328,6 +1332,47 @@ PY_DOUT = dict(fade=.14, pop=.16, cut=0, up=.3, down=.3, left=.3, right=.3, none
 PY_DIN = dict(pop=.22, fade=.22, up=.38, down=.38, left=.42, right=.42, wipe=.28, none=0, zoom=.45, slam=.3, flip=.5, iris=.5, spin=.5, bounce=.6, blur=.4, rise=.45, type=0, dissolve=.55)
 SMOOTH = 1.0
 
+def face_y(CFG, CUT, OUT, W, H, at):
+    """Vertical centre of the speaker's face (1920-scale px) at time `at`, from the Vision person matte: head top + ~230 px.
+    CFG["face_y"] overrides; cached per cut in <out>/face.json."""
+    if CFG.get("face_y"): return float(CFG["face_y"])
+    f = OUT / "face.json"; sig = f"{pathlib.Path(CUT).stat().st_mtime}_{pathlib.Path(CUT).stat().st_size}_{at:.2f}"
+    try:
+        c = json.loads(f.read_text())
+        if c.get("sig") == sig: return c["face_y"]
+    except Exception: pass
+    fy = 480.0
+    try:
+        import tempfile, shutil
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        subprocess.run([str(segment_bin()), str(CUT), f"{at:.2f}", f"{at + .05:.2f}", "1", str(tmp), "1"], check=True, capture_output=True)
+        m = next(tmp.glob("*.png"))
+        NW = 48   # 48 columns x all rows: a row holds the person if ANY column is bright (an average would miss a narrow head top)
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(m), "-vf", f"format=gray,scale={NW}:ih:flags=area", "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, check=True).stdout
+        nrows = len(raw) // NW
+        rows = [i for i in range(nrows) if max(raw[i * NW:(i + 1) * NW]) > 110]
+        if rows:
+            top = rows[0] / nrows * 1920
+            fy = min(900.0, max(300.0, top + 230))
+        shutil.rmtree(tmp, ignore_errors=True)
+    except Exception as e: print(f"  face: Vision matte failed ({e}), assuming face at y 480")
+    f.write_text(json.dumps(dict(sig=sig, face_y=fy))); return fy
+
+def pan_setup(CFG, ITEMS, CUT, OUT, W, H):
+    """The standard top-half layout: the footage keeps its full width and slides down by T px (never scaled, never side-cropped), so the
+    face is visible and centred in the section under the B-roll (face centre <= 1300 so the chin clears the subtitle); the subtitle moves
+    just under the chin, inside the safe area. T is clamped to the window's bottom edge so no gap opens between B-roll and footage."""
+    pans = [it for it in ITEMS if it["kind"] == "window" and it.get("push") == "pan"]
+    if not pans: return
+    fy = face_y(CFG, CUT, OUT, W, H, pans[0]["a"])
+    for it in pans:
+        bottom = it["y"] + it["h"]; centre = (bottom + 1920) / 2
+        T = int(max(0, min(bottom, centre - fy, 1300 - fy)))
+        it["pan"] = T
+        if it.get("cap_y") is None or it["cap_y"] == 1420: it["cap_y"] = int(min(1535, fy + T + 230))
+    CFG["_pan"] = dict(face_y=fy, T=[it["pan"] for it in pans])
+    print(f"layout: face at y {fy:.0f}; top-half windows slide the footage down " + ", ".join(f"{it['id']}={it['pan']}px" for it in pans) + " (full width, no shrink)")
+
 def push_ranges(ITEMS):
     """Footage-shrink ranges per push factor. The layout change never overlaps the window's own fade: the footage shrinks BEFORE the
     window appears and grows back only AFTER the window has fully gone (otherwise the fading window and the moving footage double-expose,
@@ -1337,7 +1382,8 @@ def push_ranges(ITEMS):
         if it["kind"] == "window" and it.get("push"):
             a = max(0.0, it["a"] - PUSH_D - PY_DIN.get(it.get("anim", "fade"), .2) * SMOOTH * .5)
             b = it["b"] + PY_DOUT.get(it.get("out", "fade"), .14) * SMOOTH
-            d.setdefault(float(it["push"]), []).append((a, b))
+            key = ("pan", int(it.get("pan", 0))) if it["push"] == "pan" else float(it["push"])
+            d.setdefault(key, []).append((a, b))
     for k, rg in d.items():
         rg.sort(); merged = []
         for a, b in rg:
@@ -1373,6 +1419,12 @@ def base_filter(ITEMS, W, H, at=None):
     def active(rg): return at is None or any(a <= at < b for a, b in rg)
     for k, (sc, rg) in enumerate(push_ranges(ITEMS).items()):
         if not active(rg): continue
+        if isinstance(sc, tuple):   # pan: the footage keeps its full width and slides down by T px so the face sits in the bottom section
+            T = sc[1] * H / 1920
+            y = f"{T * _ramp(rg, at):.1f}" if at is not None else f"'{T:.1f}*({_ramp(rg)})'"
+            parts.append(f"{cur}split[p{k}a][p{k}b];[p{k}a]gblur=sigma={sigma * 1.3:.1f}:steps=2{en(rg)}[p{k}g];"
+                         f"[p{k}g][p{k}b]overlay=x=0:y={y}:eval=frame{en(rg)}[p{k}]"); cur = f"[p{k}]"
+            continue
         if at is not None:
             f = 1 - (1 - sc) * _ramp(rg, at); sw, sh = int(W * f) // 2 * 2, int(H * f) // 2 * 2
             scale = f"scale={sw}:{sh}"
@@ -1597,6 +1649,7 @@ def main(argv):
         if not caps: print("no transcript yet:", CFG["whisper"])
         for c in caps: print(f"{c['s']:6.2f}-{c['e']:6.2f}  " + " ".join(f"*{w['t']}*" if w["em"] else w["t"] for w in c["w"]))
         return
+    pan_setup(CFG, ITEMS, CUT, OUT, W, H)
     if "--cue" in argv:
         print(f"{name}: {W}x{H} {FPS}fps {DUR:.2f}s {'HDR' if HDR else 'SDR'}; title {CFG['title'] and CFG['title'].get('t')}")
         for it in sorted(ITEMS, key=lambda i: i["a"]):

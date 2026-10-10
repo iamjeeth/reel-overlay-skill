@@ -272,6 +272,11 @@ motion graphic by hand when a showcase video of the technology exists online.
   `keep=True` on a phrase overrides). Never let a headline ghost through a dissolving window.
 - One-spot fix after a code or config change: delete the affected frames in `out/frames_fg_*` and run with `REEL_KEEP_CACHE=1`
   so the untouched frames are reused.
+- **Top-half layout standard (`preset="tophalf"`)**: the B-roll fills the top 800 px and the FOOTAGE SLIDES DOWN AT FULL WIDTH,
+  never shrunk, never side-cropped: the speaker's face is found once (Vision matte) and the slide distance puts it centred in the
+  section under the insert (face centre <= 1300 so the chin clears the subtitle); the subtitle moves just under the chin, inside the
+  safe area. The user rejected the old shrink-to-bottom with blurred side bars ("zooming me out"); `push=<factor>` remains only for
+  a deliberate special case. `--cue` prints the detected face line and each window's slide distance; `CFG["face_y"]` overrides.
 - Half-screen footage windows carry a soft dark gradient at the top (automatic) so the phrase stays readable over light films.
 - **Transitions on B-roll**: `dissolve` only. No `leak()` (film burns are off by default; the user dislikes the light wash), no flashes.
 
