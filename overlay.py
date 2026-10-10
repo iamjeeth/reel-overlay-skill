@@ -989,9 +989,17 @@ def lib_sound(name, CFG, OUT):
         ff("-i", raw, "-af", f"volume={-1 - peak:.1f}dB", "-c:a", "pcm_s16le", f); raw.unlink()
     return f
 
+SFX_PREFERRED = {   # the user's favourite small sounds (2026-10-11): used for these cues before any tone palette or soft remap
+    "click": "sfx/click/mouse-2-button-fast-click-687107.mp3",
+    "bell": "sfx/ding/handheld-bell-648960.mp3", "ding": "sfx/ding/handheld-bell-648960.mp3", "chime": "sfx/ding/handheld-bell-648960.mp3",
+}
+
 def sfx_file(name, CFG, OUT):
-    """A library file (CFG['sfx'][name], relative to CFG['sfx_lib']) or a synthesized fallback in out/sfx_gen/."""
+    """The user's preferred file for the cue (SFX_PREFERRED), else a library file (CFG['sfx'][name], relative to CFG['sfx_lib']),
+    else a synthesized fallback in out/sfx_gen/."""
     if name is None: return None
+    pref = SFX_PREFERRED.get(name)
+    if pref and (HERE / pref).exists(): return HERE / pref
     p = pathlib.Path(name).expanduser()
     if p.suffix and p.exists(): return p
     rel = CFG["sfx"].get(name)
@@ -1080,9 +1088,10 @@ def sfx_events(CFG, ITEMS, EXTRA):
             for i in range(int(min(len(it["s"]) / it["cps"], it["b"] - it["a"]) * 10)): ev.append(("key", it["a"] + i / 10, .25))
     ev += [tuple(e) for e in EXTRA]
     pal = PALETTES.get(CFG.get("_tone", {}).get("tone", "warm"), {}) if CFG.get("palette", "auto") == "auto" else {}
-    ev = [(pal.get(n, n), t, v) for n, t, v in ev]
+    keep = {n for n in SFX_PREFERRED if (HERE / SFX_PREFERRED[n]).exists()}   # the user's preferred cues are never remapped by tone or softness
+    ev = [(n if n in keep else pal.get(n, n), t, v) for n, t, v in ev]
     if CFG.get("sfx_style", "soft") == "soft":   # the default: rounded, low cues; a sharp click or glass ding pulls attention off the voice
-        ev = [(SOFT.get(n, n), t, v * .8) for n, t, v in ev if SOFT.get(n, n) is not None]
+        ev = [(n if n in keep else SOFT.get(n, n), t, v * .8) for n, t, v in ev if n in keep or SOFT.get(n, n) is not None]
     if CFG.get("emph_sfx") and CFG.get("_caps"):
         n, v = CFG["emph_sfx"]; ev += [(n, c["s"], v) for c in CFG["_caps"] if any(w["em"] for w in c["w"])]
     return sorted(ev, key=lambda e: e[1])

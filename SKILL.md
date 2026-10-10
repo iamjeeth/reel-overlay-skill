@@ -36,6 +36,11 @@ custom, before storyboarding. Sometimes simple is right.
 Headline hero words react: they slam in with a flash and the neighbouring words bump; captions pop; bars, counters, flow nodes and
 cards overshoot. All of it scales with the theme's amplitude, so `simple` stays quiet and `duotone` shouts. `--cue` prints the theme.
 
+## Sounds the user likes
+`SFX_PREFERRED` in overlay.py: every `click` cue plays `sfx/click/mouse-2-button-fast-click-687107.mp3`, every `bell` / `ding` /
+`chime` cue plays `sfx/ding/handheld-bell-648960.mp3`, before any tone palette or soft remap ("simple, so prefer these"). Other cues
+follow the palette. Extend the dict when the user names another favourite.
+
 ## Music the user likes (music/liked/)
 `music/liked/TASTE.json` lists the user's preferred songs with the skill moods they stand in for (dreamy indie R&B and soft synth ->
 lofi / upbeat / tech; Skyfall, Deep Space Samurai, Dimensions, Runaway -> trailer / cinematic). The skill NEVER downloads commercial
